@@ -48,15 +48,6 @@ python -m src.main tools    # Tool calling demo
 python -m src.main eval     # Evaluation suite
 ```
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) | Project intro pitch, live demo script, Q&A for every JD qualification, command reference |
-| [GLOSSARY.md](docs/GLOSSARY.md) | Every technical term explained — LLM, agent, tokens, LangGraph, prompt engineering, tool calling, and more |
-| [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | Step-by-step walkthrough of the internal workflow mechanism |
-| [USAGE_AND_FEATURES.md](docs/USAGE_AND_FEATURES.md) | How to run every mode, all features listed, and a recommended demo script |
-
 ## Project Structure
 
 ```
@@ -99,14 +90,6 @@ Multi_Agent_Code_Reviewer/
 │       ├── lesson3_conversation.py
 │       ├── lesson4_structured_output.py
 │       └── run_phase1.py
-│
-├── docs/                          # Documentation
-│   ├── INTERVIEW_GUIDE.md         # Project pitch, demo script, Q&A
-│   ├── GLOSSARY.md                # Technical terms reference
-│   ├── HOW_IT_WORKS.md            # Workflow mechanism explained
-│   ├── USAGE_AND_FEATURES.md      # Usage guide + feature list
-│   └── reference/                 # Planning & research documents
-│       └── job_description.txt
 │
 ├── .env.example                   # Environment variable template
 ├── .gitignore
