@@ -7,26 +7,29 @@ orchestrated via LangGraph with a Supervisor agent that merges findings.
 
 Usage:
     python -m src.main                    # Interactive demo menu
-    python -m src.main review             # Run full multi-agent review on sample diff
+    python -m src.main quick              # Fast single-agent demo
+    python -m src.main review             # Full multi-agent review on sample diff
     python -m src.main review --file PATH # Review a specific diff file
+    python -m src.main pr <GITHUB_PR_URL> # Review a REAL GitHub Pull Request
     python -m src.main tools              # Demo tool-use agent loop
     python -m src.main eval               # Run evaluation suite
     python -m src.main single AGENT       # Run single agent (logic/security/performance)
 """
 import sys
 import os
+import re
 import time
 import json
 import argparse
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.config import MODEL_NAME
+from src.config import MODEL_NAME, GITHUB_TOKEN
 from src.agents import LogicAgent, SecurityAgent, PerformanceAgent, SupervisorAgent
 from src.graph.workflow import run_review
 from src.graph.tool_agent_workflow import run_tool_agent_demo
 from src.evaluation.evaluator import TEST_SUITE, evaluate_agent_output, print_eval_summary
-from src.tools.github_tools import _get_demo_diff
+from src.tools.github_tools import _get_demo_diff, get_pr_diff
 
 
 BANNER = """
@@ -188,14 +191,15 @@ def cmd_interactive(args=None):
     """Interactive demo menu."""
     print(BANNER)
     print("  Choose a demo mode:\n")
-    print("  [1] Full Multi-Agent Review  — 3 agents + supervisor analyze code")
+    print("  [1] Full Multi-Agent Review  — 3 agents + supervisor analyze sample code")
     print("  [2] Single Agent             — Run one specialist agent")
     print("  [3] Tool-Use Demo            — Watch Claude call GitHub tools")
     print("  [4] Evaluation Suite         — Test agents against known vulnerabilities")
     print("  [5] Quick Demo (Recommended) — Fast review with summary stats")
+    print("  [6] Review Real GitHub PR    — Paste a PR URL to review live code")
     print("  [q] Quit\n")
 
-    choice = input("  Enter choice (1-5, q): ").strip()
+    choice = input("  Enter choice (1-6, q): ").strip()
 
     if choice == "1":
         cmd_review(argparse.Namespace(file=None))
@@ -208,6 +212,10 @@ def cmd_interactive(args=None):
         cmd_eval(argparse.Namespace())
     elif choice == "5":
         cmd_quick_demo()
+    elif choice == "6":
+        url = input("  Paste GitHub PR URL: ").strip()
+        token = input("  GitHub token (or press Enter to use .env): ").strip() or None
+        cmd_pr(argparse.Namespace(url=url, token=token))
     elif choice == "q":
         print("  Goodbye!")
     else:
@@ -246,8 +254,64 @@ def cmd_quick_demo():
         print()
 
     print_stats_table([stats])
-    print(f"\n  This single call cost ~${stats['estimated_cost_usd']:.4f}")
-    print(f"  With $5 credit, you can run ~{int(5.0 / max(stats['estimated_cost_usd'], 0.0001))} such calls")
+
+
+def parse_pr_url(url: str) -> tuple:
+    """Parse a GitHub PR URL into (owner, repo, pr_number).
+    Accepts: https://github.com/owner/repo/pull/123
+    """
+    match = re.match(r"https?://github\.com/([^/]+)/([^/]+)/pull/(\d+)", url.strip())
+    if not match:
+        return None, None, None
+    return match.group(1), match.group(2), int(match.group(3))
+
+
+def cmd_pr(args):
+    """Review a real GitHub Pull Request by URL."""
+    owner, repo, pr_number = parse_pr_url(args.url)
+    if not owner:
+        print(f"\n  Invalid PR URL: {args.url}")
+        print(f"  Expected format: https://github.com/owner/repo/pull/123")
+        return
+
+    token = args.token or GITHUB_TOKEN
+    if not token or token == "your-github-personal-access-token":
+        print("\n  GitHub token required to fetch real PRs.")
+        print("  Set it in .env as GITHUB_TOKEN=ghp_your_token")
+        print("  Or pass it: python -m src.main pr <URL> --token ghp_your_token")
+        return
+
+    print_header("LIVE GITHUB PR REVIEW")
+    print(f"\n  Repository : {owner}/{repo}")
+    print(f"  PR Number  : #{pr_number}")
+    print(f"  Model      : {MODEL_NAME}")
+    print(f"\n  Fetching PR diff from GitHub...")
+
+    diff = get_pr_diff(owner, repo, pr_number, github_token=token)
+
+    if diff.startswith("Error"):
+        print(f"\n  {diff}")
+        return
+
+    if not diff or diff == "No changes found.":
+        print(f"\n  No code changes found in this PR.")
+        return
+
+    diff_lines = diff.count("\n")
+    print(f"  Fetched {diff_lines} lines of diff")
+    print(f"\n  Starting multi-agent review pipeline...\n")
+
+    start = time.time()
+    result = run_review(diff)
+    elapsed = time.time() - start
+
+    print_header(f"REVIEW REPORT — {owner}/{repo}#{pr_number}")
+    print()
+    print(result["final_report"])
+
+    print_stats_table(result["agent_stats"])
+    print(f"\n  Total pipeline time: {elapsed:.1f}s")
+    print(f"  PR: https://github.com/{owner}/{repo}/pull/{pr_number}")
 
 
 def main():
@@ -261,6 +325,10 @@ def main():
     single_p.add_argument("agent", choices=["logic", "security", "performance"])
     single_p.add_argument("--file", "-f", help="Path to a .diff file")
 
+    pr_p = subparsers.add_parser("pr", help="Review a real GitHub PR by URL")
+    pr_p.add_argument("url", help="GitHub PR URL (e.g. https://github.com/owner/repo/pull/123)")
+    pr_p.add_argument("--token", "-t", help="GitHub token (or set GITHUB_TOKEN in .env)")
+
     subparsers.add_parser("tools", help="Demo tool-use agent loop")
     subparsers.add_parser("eval", help="Run evaluation suite")
     subparsers.add_parser("quick", help="Quick cost-effective demo")
@@ -271,6 +339,8 @@ def main():
         cmd_review(args)
     elif args.command == "single":
         cmd_single(args)
+    elif args.command == "pr":
+        cmd_pr(args)
     elif args.command == "tools":
         cmd_tools(args)
     elif args.command == "eval":

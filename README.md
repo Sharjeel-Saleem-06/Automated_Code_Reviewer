@@ -32,134 +32,81 @@ A production-grade **multi-agent AI system** that reviews Pull Request code chan
                       └────────────────────┘
 ```
 
-**Each agent** is a specialized AI persona powered by Claude, with expert-level system prompts using role prompting, few-shot examples, chain-of-thought reasoning, and strict JSON output schemas. The **Supervisor** agent reads all three reports and produces a unified, severity-ranked markdown review.
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **3 Specialist Agents** | Logic bugs, security vulnerabilities, performance issues |
-| **LangGraph Orchestration** | State machine workflow with shared memory |
-| **Tool Calling** | Claude autonomously calls GitHub API tools |
-| **Structured Output** | Every agent returns strict JSON schemas |
-| **Supervisor Agent** | Merges and de-duplicates findings across agents |
-| **Evaluation Framework** | Test suite with precision/recall metrics |
-| **Cost Tracking** | Per-agent token usage and USD cost estimation |
-| **Demo + Production Modes** | Works with sample diffs or real GitHub PRs |
-
 ## Quick Start
 
-### 1. Clone and setup
-
 ```bash
-git clone https://github.com/AISharjeel/Multi_Agent_Code_Reviewer.git
-cd Multi_Agent_Code_Reviewer
-python -m venv venv
-source venv/bin/activate   # macOS/Linux
+# Setup
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
+cp .env.example .env   # Add your ANTHROPIC_API_KEY
 
-### 2. Configure API key
-
-```bash
-cp .env.example .env
-# Edit .env and add your Anthropic API key
-```
-
-### 3. Run
-
-```bash
+# Run
 python -m src.main          # Interactive menu
 python -m src.main quick    # Fast single-agent demo (~$0.004)
 python -m src.main review   # Full 3-agent pipeline (~$0.04)
+python -m src.main tools    # Tool calling demo
+python -m src.main eval     # Evaluation suite
 ```
 
-## Usage Modes
+## Documentation
 
-### Interactive Menu
-
-```bash
-python -m src.main
-```
-
-Presents a menu with all demo options. Best for live demonstrations.
-
-### Full Multi-Agent Review
-
-```bash
-python -m src.main review                         # Uses built-in vulnerable demo code
-python -m src.main review --file path/to/file.diff # Review a custom diff file
-```
-
-Runs all 3 agents sequentially through the LangGraph pipeline, then the Supervisor merges their reports into a final markdown review with severity-ranked findings.
-
-### Single Agent
-
-```bash
-python -m src.main single security    # Run only the security agent
-python -m src.main single logic       # Run only the logic agent
-python -m src.main single performance # Run only the performance agent
-```
-
-### Tool-Use Demo
-
-```bash
-python -m src.main tools
-```
-
-Demonstrates Claude's **tool calling** capability. Claude autonomously decides to:
-1. Call `get_pr_diff` to fetch code changes
-2. Analyze the diff for vulnerabilities
-3. Call `post_review_comment` to post findings
-
-### Evaluation Suite
-
-```bash
-python -m src.main eval
-```
-
-Runs the full agent pipeline against 4 known test cases (SQL injection, hardcoded secrets, N+1 queries, clean code) and reports precision/recall metrics.
+| Document | Description |
+|----------|-------------|
+| [INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) | Project intro pitch, live demo script, Q&A for every JD qualification, command reference |
+| [GLOSSARY.md](docs/GLOSSARY.md) | Every technical term explained — LLM, agent, tokens, LangGraph, prompt engineering, tool calling, and more |
+| [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | Step-by-step walkthrough of the internal workflow mechanism |
+| [USAGE_AND_FEATURES.md](docs/USAGE_AND_FEATURES.md) | How to run every mode, all features listed, and a recommended demo script |
 
 ## Project Structure
 
 ```
 Multi_Agent_Code_Reviewer/
-├── src/
-│   ├── main.py                    # CLI entry point with 5 demo modes
-│   ├── config.py                  # Model selection, token limits, API keys
+│
+├── src/                           # Production source code
+│   ├── main.py                    # CLI entry point (5 demo modes)
+│   ├── config.py                  # Model, tokens, API key config
 │   │
 │   ├── agents/                    # Agent implementations
-│   │   ├── base_agent.py          # Core agent with Anthropic API + tool-use loop
+│   │   ├── base_agent.py          # Core engine: API calls, tool-use loop, JSON parsing
 │   │   ├── logic_agent.py         # Agent 1: Logic bug detection
 │   │   ├── security_agent.py      # Agent 2: Security vulnerability scanner
 │   │   ├── performance_agent.py   # Agent 3: Performance issue detector
 │   │   └── supervisor.py          # Supervisor: Merges all agent reports
 │   │
-│   ├── prompts/                   # Prompt engineering
-│   │   └── system_prompts.py      # Expert system prompts (role, CoT, few-shot, XML)
+│   ├── prompts/                   # Prompt engineering library
+│   │   └── system_prompts.py      # Expert prompts (role, CoT, few-shot, XML, JSON schema)
 │   │
 │   ├── tools/                     # Tool calling / function execution
-│   │   └── github_tools.py        # GitHub API tool schemas + executors
+│   │   └── github_tools.py        # GitHub API tool schemas + dual-mode executors
 │   │
 │   ├── graph/                     # Multi-agent orchestration
-│   │   ├── workflow.py            # LangGraph StateGraph pipeline
-│   │   └── tool_agent_workflow.py # Tool-use agent loop demonstration
+│   │   ├── workflow.py            # LangGraph StateGraph (4-node pipeline)
+│   │   └── tool_agent_workflow.py # Agentic loop with autonomous tool selection
 │   │
-│   └── evaluation/                # Testing & evaluation
-│       └── evaluator.py           # Precision/recall metrics on known test cases
+│   └── evaluation/                # Testing & quality
+│       └── evaluator.py           # Precision/recall metrics against known test cases
 │
 ├── tests/
-│   └── sample_diffs/              # Sample code diffs for testing
-│       ├── vulnerable_api.diff    # Intentionally vulnerable Flask API
+│   └── sample_diffs/              # Test data
+│       ├── vulnerable_api.diff    # Intentionally vulnerable Flask API (10+ issues)
 │       ├── mixed_issues.diff      # Mix of logic, security, and perf issues
 │       └── clean_code.diff        # Clean code (tests for false positives)
 │
-├── Phase1_Hello_Claude/           # Learning phase: Anthropic API basics
-│   ├── lesson1_first_message.py   # First API call
-│   ├── lesson2_system_prompts.py  # System prompt techniques
-│   ├── lesson3_conversation.py    # Multi-turn conversation
-│   ├── lesson4_structured_output.py # JSON structured output
-│   └── run_phase1.py              # Run all lessons sequentially
+├── tutorials/                     # Learning material
+│   └── Phase1_Hello_Claude/       # Anthropic API basics (4 lessons)
+│       ├── lesson1_first_message.py
+│       ├── lesson2_system_prompts.py
+│       ├── lesson3_conversation.py
+│       ├── lesson4_structured_output.py
+│       └── run_phase1.py
+│
+├── docs/                          # Documentation
+│   ├── INTERVIEW_GUIDE.md         # Project pitch, demo script, Q&A
+│   ├── GLOSSARY.md                # Technical terms reference
+│   ├── HOW_IT_WORKS.md            # Workflow mechanism explained
+│   ├── USAGE_AND_FEATURES.md      # Usage guide + feature list
+│   └── reference/                 # Planning & research documents
+│       └── job_description.txt
 │
 ├── .env.example                   # Environment variable template
 ├── .gitignore
@@ -167,83 +114,44 @@ Multi_Agent_Code_Reviewer/
 └── README.md
 ```
 
-## Technical Deep Dive
+## JD Coverage Map
 
-### Agent Design Pattern
+This project covers every requirement from the Claude Specialist job description:
 
-Each agent follows the same pattern defined in `base_agent.py`:
-
-```
-Input (diff) → System Prompt → Claude API → JSON Response → Parsed Findings
-```
-
-The `BaseAgent` class provides:
-- **Direct mode**: Send diff, get structured JSON response
-- **Tool-use mode**: Agentic loop where Claude calls tools iteratively
-- **Robust JSON parsing**: Handles markdown fences, extracts JSON from mixed text
-- **Token tracking**: Records input/output tokens and estimates cost per call
-
-### LangGraph State Machine
-
-The workflow in `graph/workflow.py` defines a `StateGraph` with:
-
-- **State**: `ReviewState` TypedDict with `diff`, `reviews` (append-only list), `final_report`, and `agent_stats`
-- **Nodes**: Each agent is a graph node that reads `diff` from state and appends to `reviews`
-- **Edges**: `logic_agent → security_agent → performance_agent → supervisor → END`
-- **Shared Memory**: All agents share state via LangGraph's `Annotated[list, operator.add]` reducer
-
-### Prompt Engineering Techniques
-
-Every system prompt uses Claude-optimized techniques:
-
-| Technique | How It's Used |
-|-----------|--------------|
-| **Role Prompting** | `<role>You are a Senior Security Engineer with 15 years...</role>` |
-| **XML Tags** | `<role>`, `<task>`, `<rules>`, `<output_format>`, `<example>` |
-| **Chain-of-Thought** | "Think step by step: trace through the code mentally" |
-| **Few-Shot Examples** | Complete input/output example pairs in each prompt |
-| **Structured Output** | Strict JSON schema definition with field descriptions |
-| **Constraint Rules** | "ONLY flag real issues", "ONLY valid JSON, no markdown" |
-
-### Tool Calling Pipeline
-
-The tool-use demo (`graph/tool_agent_workflow.py`) implements the full agentic loop:
-
-```
-User Request → Claude → "I need to call get_pr_diff" → Execute tool →
-Feed result back → Claude → "I need to call post_review_comment" → Execute →
-Feed result back → Claude → Final text response (end_turn)
-```
-
-Tool definitions follow Anthropic's JSON schema format with `name`, `description`, and `input_schema`.
-
-### Evaluation Framework
-
-The evaluator (`evaluation/evaluator.py`) tests agents against known-vulnerable code:
-
-- **4 test cases**: SQL injection, hardcoded secrets, N+1 queries, clean code
-- **Metrics**: Precision (are the findings correct?) and Recall (did it find all issues?)
-- **Pass threshold**: 80% recall
-
-## Cost Analysis
-
-Using **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`):
-
-| Mode | Tokens | Cost | Runs per $5 |
-|------|--------|------|-------------|
-| Quick demo (1 agent) | ~1,700 | ~$0.004 | ~1,100 |
-| Full pipeline (4 agents) | ~15,000 | ~$0.04 | ~125 |
-| Tool-use demo | ~7,500 | ~$0.02 | ~250 |
+| JD Requirement | Implementation |
+|---|---|
+| Claude (Anthropic API) | `base_agent.py` — direct `client.messages.create()` calls |
+| Prompt engineering (few-shot, CoT, role, structured) | `system_prompts.py` — 5 techniques per prompt |
+| Multi-step agent workflows with reasoning chains | `graph/workflow.py` — LangGraph 4-node StateGraph |
+| Memory handling | `ReviewState` shared state with append-only lists |
+| Tool calling and function execution pipelines | `github_tools.py` + `tool_agent_workflow.py` |
+| Structured outputs (JSON schemas) | Strict JSON schema in every prompt, `_parse_json()` robust parser |
+| Integrate with APIs and enterprise systems | GitHub API (PyGithub) — real + simulated modes |
+| Orchestration frameworks (LangChain) | LangGraph (part of LangChain ecosystem) |
+| Testing and evaluation frameworks | `evaluator.py` — 4 test cases, precision/recall |
+| Minimize hallucinations | Evaluation suite + strict schemas + clean code false-positive test |
+| AI safety and guardrails | Iteration limits, cost tracking, structured output enforcement |
+| Monitor agent performance in production | Per-agent token, latency, and cost metrics |
+| Cost-performance trade-offs | Haiku (10x cheaper than Sonnet), per-call cost estimation |
+| Document systems, workflows, and prompt libraries | `docs/` folder + `system_prompts.py` as a reusable library |
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
 | LLM | Claude Haiku 4.5 (Anthropic API) |
-| Orchestration | LangGraph (StateGraph) |
+| Orchestration | LangGraph StateGraph |
 | Language | Python 3.10+ |
 | GitHub Integration | PyGithub |
 | Configuration | python-dotenv |
+
+## Cost
+
+| Mode | Cost per run | Runs on $5 |
+|------|-------------|------------|
+| Quick demo | ~$0.004 | ~1,100 |
+| Full pipeline | ~$0.04 | ~125 |
+| Tool-use demo | ~$0.02 | ~250 |
 
 ## License
 
