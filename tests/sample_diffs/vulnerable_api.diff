@@ -1,0 +1,55 @@
+diff --git a/api/routes.py b/api/routes.py
++from flask import Flask, request, jsonify
++import sqlite3
++import subprocess
++import pickle
++import hashlib
++
++app = Flask(__name__)
++DB_PASSWORD = "admin_super_secret_2024"
++
++@app.route('/users/<user_id>')
++def get_user(user_id):
++    conn = sqlite3.connect('production.db')
++    query = f"SELECT * FROM users WHERE id = '{user_id}'"
++    user = conn.execute(query).fetchone()
++    if user:
++        orders = []
++        for order_id in user['order_ids']:
++            order = conn.execute(f"SELECT * FROM orders WHERE id = '{order_id}'").fetchone()
++            orders.append(order)
++        user['orders'] = orders
++    return jsonify(user)
++
++@app.route('/admin/run', methods=['POST'])
++def run_command():
++    cmd = request.json.get('command')
++    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
++    return jsonify({"output": result.stdout})
++
++@app.route('/upload', methods=['POST'])
++def upload_data():
++    data = request.get_data()
++    obj = pickle.loads(data)
++    return jsonify({"status": "processed", "type": str(type(obj))})
++
++@app.route('/auth/login', methods=['POST'])
++def login():
++    username = request.form['username']
++    password = request.form['password']
++    hashed = hashlib.md5(password.encode()).hexdigest()
++    query = f"SELECT * FROM users WHERE username='{username}' AND password_hash='{hashed}'"
++    user = sqlite3.connect('production.db').execute(query).fetchone()
++    if user:
++        return jsonify({"token": "static_token_12345", "user": dict(user)})
++    return jsonify({"error": "Invalid credentials"}), 401
++
++@app.route('/search')
++def search():
++    term = request.args.get('q', '')
++    results = []
++    all_items = conn.execute("SELECT * FROM products").fetchall()
++    for item in all_items:
++        if term.lower() in item['name'].lower():
++            results.append(item)
++    return jsonify(results)

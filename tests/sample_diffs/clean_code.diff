@@ -1,0 +1,15 @@
+diff --git a/utils/math_helpers.py b/utils/math_helpers.py
++from typing import List, Optional
++
++def calculate_average(numbers: List[float]) -> Optional[float]:
++    if not numbers:
++        return None
++    return sum(numbers) / len(numbers)
++
++def clamp(value: float, min_val: float, max_val: float) -> float:
++    return max(min_val, min(value, max_val))
++
++def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
++    if denominator == 0:
++        return default
++    return numerator / denominator

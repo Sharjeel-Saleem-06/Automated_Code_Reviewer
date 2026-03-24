@@ -1,0 +1,32 @@
+diff --git a/services/user_service.py b/services/user_service.py
++import os
++import json
++import requests
++
++API_KEY = os.environ.get("API_KEY")
++
++def get_user_profile(user_id: int) -> dict:
++    if user_id is None:
++        return {"error": "user_id required"}
++
++    user = db.query(f"SELECT * FROM users WHERE id = {user_id}")
++
++    enriched = {}
++    enriched['basic'] = user
++    enriched['posts'] = db.query(f"SELECT * FROM posts WHERE author_id = {user_id}")
++
++    followers = db.query(f"SELECT * FROM follows WHERE target_id = {user_id}")
++    for follower in followers:
++        profile = db.query(f"SELECT * FROM users WHERE id = {follower['follower_id']}")
++        follower['profile'] = profile
++
++    enriched['followers'] = followers
++    return enriched
++
++def process_webhook(payload: str) -> dict:
++    data = json.loads(payload)
++    if data.get('type') == 'payment':
++        amount = data['amount']
++        if amount > 0:
++            return {"status": "processed", "amount": amount}
++    return {"status": "ignored"}
