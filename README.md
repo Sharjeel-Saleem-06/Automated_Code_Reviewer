@@ -116,7 +116,7 @@ This project covers every requirement from the Claude Specialist job description
 | AI safety and guardrails | Iteration limits, cost tracking, structured output enforcement |
 | Monitor agent performance in production | Per-agent token, latency, and cost metrics |
 | Cost-performance trade-offs | Haiku (10x cheaper than Sonnet), per-call cost estimation |
-| Document systems, workflows, and prompt libraries | `docs/` folder + `system_prompts.py` as a reusable library |
+| Document systems, workflows, and prompt libraries | `system_prompts.py` as a reusable prompt library + this README |
 
 ## Tech Stack
 
